@@ -21,7 +21,7 @@ args = parser.parse_args()
 #Set up the retrieval
 init_dict = {'rad_dir': args.direc,\
              'rad_name': args.name,\
-             'main': '/n/seasasfs02/dcusworth/CH4/IMAP_Alana/input/',\
+             'main': '/Users/cusworth/Documents/IMAP_DOAS/input/',\
              'wave_pos': 'ancillary/av_wvl.txt',\
              'alt_agl_km': 3,\
              'latitude': float(args.lat),\

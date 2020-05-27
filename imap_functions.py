@@ -624,6 +624,42 @@ def load_raw_observations(files, set_inputs, wave_class, met, cs):
     return rgb, rad_sub2, wave_class, met
 
 
+
+def opt_depth(scaling_ch4, scaling_h2o, scaling_n2o, met, cs):
+
+    #Initialize optical depth
+    tau = np.zeros(cs.cs_matrix_ch4.shape[0])
+
+    #Do methane optical depth
+    for idx in range(len(met.bnd_ch4)-1):
+        iscale = scaling_ch4[idx]
+        isel = (met.pmid >= met.bnd_ch4[idx]) & (met.pmid < met.bnd_ch4[idx+1])
+        new_layer_vmr = scaling_ch4[idx] * met.vmr_CH4[isel]
+        layer_od = np.sum(met.AMF[isel] * cs.cs_matrix_ch4[:,isel] * new_layer_vmr * met.VCD_dry[isel],1)
+        tau += layer_od
+
+    #Do H2O optical depth
+    for idx in range(len(met.bnd_h2o)-1):
+        iscale = scaling_h2o[idx]
+        isel = (met.pmid >= met.bnd_h2o[idx]) & (met.pmid < met.bnd_h2o[idx+1])
+        new_layer_vmr = scaling_h2o[idx] * met.vmr_H2O[isel]
+        layer_od = np.sum(met.AMF[isel] * cs.cs_matrix_h2o[:,isel] * new_layer_vmr * met.VCD_dry[isel],1)
+        tau += layer_od
+
+    #Do N2O optical depth
+    for idx in range(len(met.bnd_n2o)-1):
+        iscale = scaling_n2o[idx]
+        isel = (met.pmid >= met.bnd_n2o[idx]) & (met.pmid < met.bnd_n2o[idx+1])
+        new_layer_vmr = scaling_n2o[idx] * met.vmr_N2O[isel]
+        layer_od = np.sum(met.AMF[isel] * cs.cs_matrix_n2o[:,isel] * new_layer_vmr * met.VCD_dry[isel],1)
+        tau += layer_od
+
+    #Compute Transmission spectrum
+    #T_hi = met.Ssolar * np.exp(-tau)
+    
+    return tau
+
+
 def Make_Jac4(T, lcoefs, scoefs, wave_class, met, set_inputs, cs, sCH4, sH2O, sN2O):
 
     #Redefine wavelength grid
@@ -795,6 +831,10 @@ def retrieve_scene2(Y, set_inputs, wave_class, met, cs):
     inv_prms.K = K
     inv_prms.xhat = x_1
     inv_prms.Sa = Sa
+    inv_prms.sCH4_hat = sCH4_hat
+    inv_prms.sH2O_hat = sH2O_hat
+    inv_prms.sN2O_hat = sN2O_hat
+    inv_prms.Shat = S_1
 
     retrieved_CO2 = (np.dot(x_1[0:lCH4] * met.ch4_red_A, met.h) * 1e9) / 1000
     #retrieved_CO2 = x_1[0] * met.ch4_red_A[0] * 1e6
@@ -806,11 +846,20 @@ def retrieve_scene2(Y, set_inputs, wave_class, met, cs):
 #Function to run retrieval over an entire scene
 def run_retrieval(rad_sub_enmap, wave_class, set_inputs, met, cs, scaling = 1, out_name='temp'):
 
+    #Write profile data
+    prof_dict = {'VCD': met.VCD_dry, 'VMR_CH4': met.vmr_CH4, 'VMR_H2O': met.vmr_H2O,  \
+                 'Tmid': met.Tmid, 'Pmid': met.pmid, 'Zmid':met.zmid}
+    prof_df = pd.DataFrame.from_dict(prof_dict, orient='columns')
+    prof_df.to_csv('output/profile_info.csv')
+
+    #Run retrieval
     try:
         xCH4_ENMAP = pickle.load(open('./output/' + out_name + '.p', 'rb'))
     except:
 
         xCH4_ENMAP = np.zeros(rad_sub_enmap.shape[0:2])
+        SF = np.zeros(rad_sub_enmap.shape[0:2])
+        SH = np.zeros(rad_sub_enmap.shape[0:2])
 
     xsel, ysel = np.where(xCH4_ENMAP == 0)
 
@@ -823,9 +872,15 @@ def run_retrieval(rad_sub_enmap, wave_class, set_inputs, met, cs, scaling = 1, o
             inv_prms, retrieved_CH4 = retrieve_scene2(Y, set_inputs, wave_class, met, cs)
 
             xCH4_ENMAP[isel,jsel] = retrieved_CH4
+            SF[isel,jsel] = inv_prms.sCH4_hat[0]
+            SH[isel, jsel] = inv_prms.Shat[0,0]
+            
             out_prms['pixel_'+ str(isel) + str(jsel)] = inv_prms
             
             pickle.dump(xCH4_ENMAP, open('./output/' + out_name + '.p', 'wb'))
+            pickle.dump(SF, open('./output/' + out_name + '_SF.p', 'wb'))
+            pickle.dump(SH, open('./output/' + out_name + '_SH.p', 'wb'))
+            
     return xCH4_ENMAP, out_prms
 
 
