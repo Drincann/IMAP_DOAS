@@ -836,6 +836,9 @@ def retrieve_scene2(Y, set_inputs, wave_class, met, cs):
     inv_prms.sN2O_hat = sN2O_hat
     inv_prms.Shat = S_1
 
+    xa_diag = np.diag(xa_full)
+    inv_prms.Shat_conv = (xa_diag.dot(S_1)).dot(xa_diag.T)
+
     retrieved_CO2 = (np.dot(x_1[0:lCH4] * met.ch4_red_A, met.h) * 1e9) / 1000
     #retrieved_CO2 = x_1[0] * met.ch4_red_A[0] * 1e6
 
