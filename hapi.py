@@ -155,7 +155,7 @@ def arange_(lower,upper,step):
     if abs((upper-upper_new)-step) < 1e-10:
         upper_new += step
         npnt += 1    
-    return linspace(lower,upper_new,npnt)
+    return linspace(lower,upper_new,int(npnt))
 
 # ---------------------------------------------------------------
 # ---------------------------------------------------------------
